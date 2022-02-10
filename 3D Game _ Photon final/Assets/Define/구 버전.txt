@@ -1,0 +1,7 @@
+구 버전
+smcs.rsp (.Net 2.0 subset 사용시)
+gmcs.rsp (.Net 2.0 )
+
+구 버전 파일이름 => mcs.rsp로 바뀜 (.Net 2.0 subset, .Net 2.0 둘다 가능 )
+
+Assets폴더 바로 하위로 위치시켜야 적용됨

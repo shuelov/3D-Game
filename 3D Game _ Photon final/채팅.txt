@@ -1,0 +1,85 @@
+<<게임 씬>>
+1. 캔버스에 패널(채팅용) 추가
+자식 개체로 text추가(글자는 왼쪽.아래로 정렬)하고 vertical overflow에서 truncate말고 overflow로 함. 부모객체인 패널에 mask 컴포넌트 추가
+2.캔버스에 패널(접속자 확인용&종료 버튼위함) 다시 추가하고 text, button(종료 버튼) 자식객체로추가
+3.스테이지 매니저 스크립트
+/*변수추가*/
+    //로그 정보
+    public Text TxtLogMsg;
+    //몇 명 들어와 있는지
+    public Text TxtConnect;
+
+  //새로운 플레이어가 들어왔을 때 타는 콜백 함수
+   void OnPhotonPlayerConnected(PhotonPlayer newPlayer)
+    {
+        Debug.Log(newPlayer.ToStringFull());
+        GetConnectPlayerCount();
+    }
+
+  //기존 플레이어가 나갔을 때 타는 콜백 함수
+    void OnPhotonPlayerDisconnected(PhotonPlayer outPlyaer)
+    {
+
+        Debug.Log(outPlyaer.ToStringFull());
+
+        GetConnectPlayerCount();
+    }
+
+    //룸 접속자를 조회하는 함수
+    void GetConnectPlayerCount()
+    {
+        Room currRoom = PhotonNetwork.room;
+
+        TxtConnect.text = currRoom.PlayerCount.ToString()
+            + "/"
+            + currRoom.MaxPlayers.ToString();
+     }
+
+
+!! Awake()(혹은 Start, 플레이어 생성하는 곳 아래에)에서도 GetConnectPlayerCount(); 호출해야
+'나'의 입장에서 룸 접속자 수 변함
+
+
+    //EXIT 버튼 누르면 이 함수 호출되게 연결해줘야함
+    public void OnClickExitRoom()
+    {
+        //로그메세지에 출력할 문자열 생성
+        //문자열에 색상 줄 수 있음
+        string msg = "\n\t<color=#ff0000>["
+        + PhotonNetwork.player.NickName
+        + "]Disconnected\n</color>";
+
+        Debug.Log(msg);
+        
+        //들어오면서 만들었던 모든 객체를(rpc포함) 삭제하라는 메시지를 클라이언트들에 다 보냄
+        PhotonNetwork.LeaveRoom();
+    }
+
+    void OnLeftRoom()
+    {
+        //모든게(캐릭터부터 사라짐) 정리되고 로비로 다시 넘어감
+        SceneManager.LoadScene("sNetLobby");
+    }
+
+
+4. StageManager게임오브젝트에
+Photon View스크립트 추가(꼭  rpc있는 stagemanager 스크립트 있는 곳에 들어가 있어야함)
+추가 후
+[ StageManager스크립트]
+    //포톤뷰 변수추가
+    PhotonView pv;
+
+    //Awake에서 레퍼런스연결       pv = GetComponent<PhotonView>(); 
+
+    //RPC함수추가
+    [PunRPC]
+    void LogMsg(string msg)
+    {
+        TxtLogMsg.text = TxtLogMsg.text + msg;
+    }
+
+
+<ex.총알에 자기자신 이름을 달아서 몬스터맞으면 삭제하고 당사자 점수 올리기>
+
+//setscore 본인 점수오름
+//getscore 다른사람 점수찾아올 수 있음

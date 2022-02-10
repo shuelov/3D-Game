@@ -1,0 +1,7 @@
+ManifestFileVersion: 0
+CRC: 2737182655
+AssetBundleManifest:
+  AssetBundleInfos:
+    Info_0:
+      Name: scene/study.study
+      Dependencies: {}

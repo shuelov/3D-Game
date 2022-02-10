@@ -1,0 +1,149 @@
+- 본 파일은 수업의 흐름을 따라가기 위해 만든 파일임을 알려드립니다 -
+
+- 어느정도 정리를 해두긴 했지만, 수업 하면서 정리 한 것이라 설명이 매우 미흡할 수 있습니다.
+  더 자세한 설명이 필요하시면 강사님 스크립트를 참고하시거나, 연락주세요. -
+
+
+
+1. PlayerCtrl 스크립트 열기
+
+2. 폴더창에서 우클릭 - Import Package - Utility - SmoothFollow.cs Import
+
+3. SmoothFollow.cs를 열고 target을 private -> public 으로 변경
+
+4. SmoothFollow.cs를 보면, using으로 UnityStandardAssets.Utility 선언되어 있으니, PlayerCtrl에도 UnityStandardAssets.Utility 선언
+
+   View ID는 첫 캐릭터는 1001, 두번째 캐릭터는 2001 같은 1000단위로 증가한다
+   그에 딸려있는 물건들은 첫 캐릭터의 물건 - 1002, 1003 같이 1 단위로 증가한다
+
+5.  PlayerCtrl Awake 이전에 다음을 추가
+
+    // 포톤 추가 //
+
+    // 리지드바디 추가(캐릭터가 이상하게 움직이지 않게 하기 위함)
+    Rigidbody myRbody;
+
+    // PhotonView 컴포넌트를 할당할 레퍼런스(네트워크)
+    PhotonView pv = null;
+
+    // 위치 정보를 송수신할 때 사용할 변수 선언 및 초기값 설정
+    Vector3 currPos = Vector3.zero;
+    Quaternion currRot = Quaternion.identity;
+
+    // 메인 카메라가 추적할 CamPivot(플레이어) 게임오브젝트 - 카메라를 동적으로 연결하기 위함
+    public Transform camPivot;
+
+
+◈ 네트워크 동기화는 Start함수보다 빠르게 Awake함수보다는 느리게 발생된다.
+   그렇기 때문에 네트워크 관련해서는 Awake함수에서 처리해줘야한다.
+
+
+6. Awake 함수에 다음을 추가
+
+    	// 포톤 추가 //
+
+    	// Rigidbody 컴포넌트 할당(자신의 폰에선 상관없지만, 다른 사람의 폰에선 고정되지 못하고 날아가기 때문)
+    	myRbody = GetComponent<Rigidbody>();
+
+    	// PhotonView 컴포넌트 할당
+        pv = GetComponent<PhotonView>();
+
+        // PhotonView Observed Components 속성에 컴포넌트를 스크립트로 연결
+        pv.ObservedComponents[0] = this;
+
+   
+6-1. Play를 눌러 Player에서 Observed Components에 플레이어가 연결되었는지 확인해보기
+
+
+7. Awake 함수에 계속 이어서 다음을 추가
+
+        // 데이터 전송 타입을 설정(프리팹에서도 미리 설정 가능하다)
+        pv.synchronization = ViewSynchronization.UnreliableOnChange;
+
+   = 여기까지 했을 시에, 카메라는 붙지만, 다른 캐릭터가 들어오면 그 캐릭터에게 붙으므로 문제가 된다.
+
+8. Awake 함수에 계속 이어서 다음을 추가(카메라 설정)
+
+        // PhotonView가 자신의 플레이어일 경우에 카메라가 제대로 붙음(메인 카메라에 SmoothFollow 스크립트를 붙여주자)
+        if(pv.isMine) // PhotonNetwork.isMasterClient - 마스터 한정
+        {
+            Camera.main.GetComponent<SmoothFollow>().target = camPivot;
+        }
+
+8-1. 플레이어 프리팹 Inspector에서 Cam Pivot에 캐릭터를 연결해준다.
+8-2. 여러개를 틀어서 카메라가 각각 붙는지 테스트 해보자.(카메라는 따라다니지만, 둘이 같이 움직일 것이다)
+
+9. Awake 함수에 계속 이어서 다음을 추가
+
+        // 원격 플레이어의 위치 및 회전값을 처리할 변수의 초기값 설정
+        // 이런 처리를 안할 시 순간이동 현상 목격
+        currPos = myTr.position;
+        currRot = myTr.rotation;
+
+10. Start 함수 수정 - 자신 캐릭터만 컨트롤 하기 위함
+
+ 	if(pv.isMine)
+        {
+            // 일정 간격으로 주변의 가장 가까운 Enemy를 찾는 코루틴 
+            StartCoroutine(this.TargetSetting());
+
+            // 가장 가까운 적을 찾아 발사...
+            StartCoroutine(this.ShotSetting());
+        }
+
+11. Update 함수 수정 - 자신 캐릭터만 컨트롤 하기 위함
+
+    if(pv.isMine)을 생성 후, #if UNITY_ANDROID의 #endif까지 넣어준다
+
+    그리고 다음을 추가
+
+     else
+        {
+            // 원격 플레이어의 아바타를 수신받은 위치까지 부드럽게 이동시키자
+            myTr.position = Vector3.Lerp(myTr.position, currPos, Time.deltaTime * 3.0f);
+
+            // 원격 플레이어의 아바타를 수신받은 각도만큼 부드럽게 회전시키자
+            myTr.rotation = Quaternion.Slerp(myTr.rotation, currRot, Time.deltaTime * 3.0f);
+        }
+
+12. 다음과 같은 함수를 만든다 - 서로 동기화 시키기 위함
+
+* PhotonView 컴포넌트의 Observe 속성이 스크립트 컴포넌트로 지정되면 PhotonView
+* 컴포넌트는 데이터를 송수신할 때, 해당 스크립트의 OnPhotonSerializeView 콜백 함수를 호출한다. 
+*/
+
+    void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
+    {
+
+        // 로컬 플레이어의 위치 정보를 송신
+        // 자기 자신이 조작하는 캐릭터이기 때문에 정보를 받을 필요는 없음
+        if (stream.isWriting)
+        {
+            // Boxing
+            stream.SendNext(myTr.position);
+            stream.SendNext(myTr.rotation);
+        }
+        else 
+        {
+            // UnBoxing - 박싱은 Object형이기 때문에 적절한 형변환이 필요하기 때문에 Vector3, Quaternion사용
+            currPos = (Vector3)stream.ReceiveNext();
+            currRot = (Quaternion)stream.ReceiveNext();
+        }
+    }
+
+
+
+13. ShotStart 함수 위에 [PunRPC] 라는 Attribute 선언
+
+14. if(shot && check) 를 찾아 ShotStart아래에 
+
+    // 포톤 추가 - 원격 네트워크 플레이어의 자신의 아바타 플레이
+    pv.RPC("ShotStart", PhotonTargets.Others, null);
+
+- pv.RPC("함수명", PhotonTargets.Others/PhotonTargets.All, null);
+
+PhotonTargets.Others - 자신의 폰이 다른 사람의 폰에 있는 자신의 캐릭터에 있는 동일한 함수를 호출
+PhotonTargets.All - 자신의 폰이 자신의 폰을 포함해 다른 사람의 폰에 있는 자신의 캐릭터에 있는 동일한 함수를 호출
+
+= 여기까지 했을 시, 캐릭터끼리는 동기화가 되지만, 로직상 몬스터는 각각의 폰에서 각각 소환하기 때문에,
+  서로 다른 몬스터를 때린다. 이 부분은 추후 알아서 수정해야된다.
